@@ -1,0 +1,245 @@
+---
+title: "Assessed Practical 1"
+output: html_AssessedPractical1Notebook
+---
+
+Aim: Investigate how the number of medals a country wins can be predicted from national population and GDP, and how consistent these relationships are. 
+
+
+```{r}
+# changed name of the dataframe to "onegold" upon import
+onegold <-medal_pop_gdp_data_statlearn 
+summary(onegold)
+str(onegold)
+#quick summary statistics
+```
+
+Regression Tasks: 
+
+1- Perform a linear regression to predict medal count in 2008 and 2012 using population and GDP, Explain the model and the approach to learn about the model parameters, report your results and comment on your findings: 
+
+
+
+```{r}
+#building the linear regression models to predict 2008 and 2012
+
+model2008 <- glm(Medal2008 ~ GDP+Population, data = onegold)
+summary(model2008)
+confint(model2008)
+
+model2008 <- glm(Medal2012 ~ GDP+Population, data = onegold)
+summary(model2012)
+confint(model2008)
+
+#creating a new dataframe to put the predictions in: 
+rm(predictions_2008_and_2012)
+predictions_2008_and_2012<- data.frame(Country = onegold$Country, Population = onegold$Population, GDP = onegold$GDP) 
+#Adding the real and predicted data to the new df
+
+#2008
+predictions_2008_and_2012['Actual_2008'] <- onegold$Medal2008 
+predictions_2008_and_2012['Predicted_2008'] <- predict(model2008)
+
+#2012
+predictions_2008_and_2012['Actual_2012'] <- onegold$Medal2012
+predictions_2008_and_2012['Predicted_2012'] <- predict(model2012)
+
+predictions_2008_and_2012
+
+#Plotting predicted vs observed values: 
+
+library(ggplot2)
+plot_2008 <- ggplot(predictions_2008_and_2012, aes(x=log(Actual_2008), y=log(Predicted_2008))) + 
+  geom_point(size=2, shape=16) + xlab("Log2(Actual medals in 2008)") +
+  ylab("Log2(Medals predicted in 2008)") + geom_smooth(method = lm)
+plot_2008 # plotting actual and predicted in 2008
+
+plot_2012<- ggplot(predictions_2008_and_2012, aes(x=log(Actual_2012), y=log(Predicted_2012))) +  
+  geom_point(size=2, shape=16) + xlab("Log2(Actual medals in 2012)") +
+  ylab("Log2(Medals predicted in 2012)") + geom_smooth(method = lm)
+plot_2012 # plotting actual and predicted in 2012
+```
+
+
+
+
+
+2) How consistent are the effects of Population and GDP over time?
+
+One way to determine if the effects of population and GDP over time is to plot the medal counts from both the 2012 and 2015 models against one another. This is performed in the code below. Assuming that the effects of population and time were the same over time, we would expect the 2008 and 2012 models to be equal to each other (same log(medal) values). As illustrated in the graph, the number of medals predicted in 2008 and 2012 based on population and GDP as explanatory variables are highly similar (all values lying on the trendline except for 3), indicating that the effects of GDP and population are consistent over time
+
+```{r}
+rm(Medalplot)
+
+# Log transformed the medals 
+library(ggplot2)
+Medalplot <- ggplot(predictions_2008_and_2012, aes(x=log(Predicted_2008), y=log(Predicted_2012))) +
+  geom_point(size=2, shape=1) + xlab("Log2(Medals predicted in 2008)") +
+  ylab("Log2(Medals predicted in 2012)") + geom_smooth(method = lm)
+Medalplot 
+```
+
+
+
+
+
+
+3) Using the regression for the 2012 medal count make a prediction for the results of 2016
+
+The below used the "model2012" model to predict the medal count in 2016, I then appended this to a new dataframe "newdata" which only contained country, population, gdp, predicted medals in 2016, and actual medals in 2016. I also rounded the values for predicted medals (as they are count data). 
+
+```{r}
+library(dplyr)
+
+rm(newdata)
+newdata = data.frame(Country = onegold$Country, Population = onegold$Population, GDP = onegold$GDP)
+newdata
+predictions_2016 = predict(model2012, newdata)
+predictions_2016
+
+newdata['Predicted'] <- predictions_2016 #adds the data to the df
+newdata ['Actual' ]<- onegold$Medal2016# same as above
+newdata <- newdata %>% mutate(across(starts_with("Predicted"), round, 0)) #Round to whole numbers
+newdata
+```
+
+
+4- Plot your predictions against the actual results of 2016. If the results are hard to see, use a transformation of the axes to improve clarity. Comment on your findings. How good are the predictions? Which countries are outliers from the trend?
+
+In order to improve the clarity of the results, the predicted and actual medal counts were transformed to log2(medal count). In the graph below, we can see that there are a significant number of outliers. The geom_smooth() method provided a regression line and 95% confidence band providing a representation of the uncertainty about your regression line which many values can be seen outside of, suggesting relatively poor predictive power. Furthermore, these outliers from the trend are shown in the column "outside" in the "newdata" dataframe. From this, 34 countries lay within the trend, and 37 lay outside.   
+
+```{r}
+library(ggplot2)
+
+APplot <- ggplot(newdata, aes(x=log(Actual), y=log(Predicted))) +
+  geom_point(size=2, shape=16) + xlab("Log(Actual medals won in 2016)") +
+  ylab("Log(Medals predicted in 2016)") + geom_smooth(method = lm) # the glm vs lm doesn't appear to make a difference to the plot
+#transformed the medal counts to log2 values. 
+APplot
+
+# Get fit, and make a variable with labels for points outside CIs
+fit <- lm(newdata$Predicted~newdata$Actual) 
+dat <- predict.lm(fit, interval="confidence") #creates a dataframe with the fit, lower and upper CI's
+newdata$outside <- ifelse(newdata$Actual < dat[,"upr"] & newdata$Actual > dat[,"lwr"], "", as.character(newdata$Country)) # adds a column "outside" with a country name if it is outside the CI's below
+
+```
+
+
+
+
+
+MODEL SELECTION TASKS: 
+
+1) Fit linear regressions models for the total medal count in 2012 using: (i) Population alone; (ii) GDP
+alone; (iii) Population and GDP. Perform model selection using the Akaike Information Criterion and report your results.
+
+The AICs for model1 (GDP), model2 (Population), and model3 (GDP + population) are 551.74,618.15, and 553.19 respectively. Although model2 has a larger AIC relative to the others.  The AICs of model1 and model3 are fairly similar, therefore, we should compare these. Model3 is exp(551.74-553.2)/2), or 0.482 times as probable as model 1, indicating it might not be the best choice. Conversely,  another rule of thumb is that models within 1-2 of the minimum AC have substantial support, suggesting that model3 is acceptable 
+
+
+```{r}
+
+model1 <- glm(Medal2012~GDP, data = onegold)
+model2 <- glm(Medal2012~Population, data = onegold)
+model3 <- glm(Medal2012~GDP+Population, data = onegold)
+
+summary(model1) #summary of GLMs includes AIC
+summary(model2)
+summary(model3)
+```
+
+
+
+
+2) Use cross-validation to perform a model selection between (i) Population alone; (ii) GDP alone; (iii) Population and GDP. Comment on and report your results. Do your results agree with the model selected by the AIC?
+
+From performing the cross validation 1000 times with a 60% Training/40% Test split 1000 times, the log probability of model 1 (x4 ~ x6, or Medals in 2012 ~ GDP) was the highest. This is also supported by the iterations, which showed model 1 winning 70% (700/1000) of the time.This does agree with the AIC, which showed this model having the lowest AIC (551.74).
+
+Although the log probability of the scatter plot (which shows the first iteration) shows a higher log probability for model 3 (Medals in 2012 ~ GDP + Population) compared to model 2 (Medals ~Population). In fact, when repeated 1000x, this shows a better log probability for model 2  of 20% (200/1000) compared to 10% (100/1000) for model 3. However, this doesn't agree with the AIC, which suggests that model 3 is a better choice than model 2 (553.19 for model 3 and 618.15 for model 2)
+
+```{r}
+
+x1 = onegold$Medal2012
+x2 = onegold$GDP
+x3 = onegold$Population
+
+cvdata = data.frame(x2,x3, x1) # had issues using onegold data frame so created this
+
+#Repeat cross validation 1000 times 
+
+winner = rep(NA, 1000)
+for (iteration in 1:1000){
+
+trainRows<-runif(nrow(cvdata))>0.60 #randomly put aside 60% of the data
+training<-cvdata[trainRows,]# about 60% (42 rows training)
+testing <-cvdata[!trainRows,]# about 40% testing (29 rows testing)
+
+
+formulas = c("x1~x2", "x1~x3","x1~x2+x3") #list the possible models 1,2, and 3 respectively in graphs. 
+predictive_log_likelihood = rep(NA, length(formulas)) #Replicate elements of vectors and lists
+
+#Loop
+
+for (i in 1:length(formulas)){
+
+current_model = glm(formula = formulas[i], data = training) #First, fit model with training data
+sigma = sqrt(summary(current_model)$dispersion) #Extract 'dispersion parameter' 
+ypredict_mean = predict(current_model, testing) #Get the predicted mean for each new data point
+predictive_log_likelihood[i] = sum(dnorm(testing$x1, ypredict_mean, sigma, log=TRUE))
+#Now calculate the predictive log probability through summing the  log probabilities of each output value in the test data
+}
+
+winner[iteration] = which.max(predictive_log_likelihood)
+}
+
+hist(winner, breaks = seq(0.5, 7.5, 1), xlab='Model', ylab='Frequency', main='')# The histogram showing how many times each model won out of 1000. 
+
+```
+
+
+
+
+3. Using the three fitted models from Model Selection Task 1, predict the results of Rio 2016. Which model predicts best? Justify your reasoning. Compare this result with the earlier results on model performance.
+
+In order to decide which of the model predicts best, the RMSE, which is aggregates the magnitudes of the errors in predictions for the datapoints into a single measure of predictive power was calculated. The RMSEs were 8.908145, 18.18077, and 9.112593 for models 1,2, and 3 respectively. A smaller RMSE indicates a better fit of the data. Based on the this information and the information gathered above. The best model for prediction is model 1, which predicts the number of medals based on GDP. This had the lowest AIC score and performing 1000 iterations of cross-validation showed that model 1 had the highest log-probability for about 70% of the runs.   
+
+
+
+```{r}
+library(dplyr)
+
+rm(predata)
+preddata<-newdata #create the "preddata" dataframe for this
+
+model1pred = predict.glm(model1, preddata) #prediction based on GDP
+model2pred = predict.glm(model2, preddata) #prediction based on GDP and population 
+model3pred = predict.glm(model3, preddata) #prediction based on both
+
+#Dropped the previous columns, so it only contains country, population, GDP and Actual medals won in 2016 .
+preddata <- subset(preddata, select = -c(Predicted))
+preddata <- subset(preddata, select = -c(Actual))
+preddata <- subset(preddata, select = -c(outside))
+preddata
+
+#Adding the 2016 medal predictions to the dataframe 
+
+preddata['Model 1 Predictions (GDP)'] <- model1pred
+preddata['Model 2 Predictions (Population)'] <- model2pred
+preddata['Model 3 Predictions (GDP + Population)'] <- model3pred
+preddata <- preddata %>% mutate(across(starts_with("Model"), round, 0)) #Round the predictions to whole numbers
+preddata 
+
+#comparing how well each model predicts the actual number of medals won in 2016, for this, I used the Root mean squared error
+
+install.packages("Metrics")
+library(Metrics)
+rmse(preddata$Actual,preddata$`Model 1 Predictions (GDP)`)
+rmse(preddata$Actual,preddata$`Model 2 Predictions (Population)`)
+rmse(preddata$Actual,preddata$`Model 3 Predictions (GDP + Population)`)
+```
+
+
+
+
+
+
+
