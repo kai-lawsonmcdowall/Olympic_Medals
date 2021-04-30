@@ -1,1 +1,1 @@
-# Still a work in progress, but essentially a small assignment where I've played around with R's Plot3D package to create some interesting plots of multivariate linear regression models. 
+# A practial which looked olympic medals won in 2008, 2012, and 2016, and used techniques like multivariate linear regression and model selection techniques such as AIC and K-fold cross validiation
